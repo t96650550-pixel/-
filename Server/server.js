@@ -21,6 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
+app.set("trust proxy", 1);
 
 // Rate limiter for login
 const loginLimiter = rateLimit({
