@@ -321,8 +321,11 @@ io.on('connection', (socket) => {
 // Serve client build if exists
 const clientBuild = path.join(__dirname, 'client', 'build');
 app.use(express.static(clientBuild));
+
 app.get('*', (req, res) => {
-  res.sendFile(path.join(clientBuild, 'index.html'), err => { if (err) res.status(500).send(err); });
+  res.sendFile(path.join(clientBuild, 'index.html'), err => {
+    if (err) res.status(500).send(err);
+  });
 });
 
 // Start server
