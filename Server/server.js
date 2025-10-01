@@ -381,6 +381,30 @@ async function start() {
     } catch (err) { console.error('/users err', err); res.status(500).json({ error: 'Server error' }); }
   });
 
+  // messages API: list messages (optionally by room)
+  app.get('/messages', authMiddleware, async (req, res) => {
+    try {
+      const room = req.query.room || null;
+      const limit = parseInt(req.query.limit || '200', 10);
+      let rows;
+      if (room) rows = await dbAll('SELECT * FROM messages WHERE room = ? ORDER BY id ASC LIMIT ?', [room, limit]);
+      else rows = await dbAll('SELECT * FROM messages ORDER BY id ASC LIMIT ?', [limit]);
+      res.json({ messages: rows });
+    } catch (err) { console.error('/messages err', err); res.status(500).json({ error: 'Server error' }); }
+  });
+
+  // admin delete message via HTTP
+  app.delete('/messages/:id', authMiddleware, roleCheck('admin'), async (req, res) => {
+    try {
+      const id = req.params.id;
+      await dbRun('DELETE FROM messages WHERE id = ?', [id]);
+      await audit(req.user.id, 'delete_message_admin', id, {});
+      // notify clients
+      io.emit('delete_message', { id });
+      res.json({ ok: true });
+    } catch (err) { console.error('/messages delete err', err); res.status(500).json({ error: 'Server error' }); }
+  });
+
   // profile
   app.get('/me', authMiddleware, async (req, res) => {
     try {
@@ -406,21 +430,52 @@ async function start() {
     onlineUsers[uid].push(socket.id);
     console.log('connected', uid, socket.id);
 
+    // send recent messages to newly connected socket (optional)
+    (async () => {
+      try {
+        const rows = await dbAll('SELECT * FROM messages ORDER BY id ASC LIMIT 200');
+        socket.emit('chat_history', rows);
+      } catch (e) {}
+    })();
+
     socket.on('join_room', ({ room }) => {
       if (room) socket.join(room);
     });
 
+    // message event: save + emit
     socket.on('message', async (data) => {
       try {
         const { toId, room, content } = data;
         const fromId = socket.user.id;
-        await dbRun('INSERT INTO messages (from_id,to_id,room,content) VALUES (?,?,?,?)', [fromId, toId||null, room||null, content]);
+        const r = await dbRun('INSERT INTO messages (from_id,to_id,room,content) VALUES (?,?,?,?)', [fromId, toId||null, room||null, content]);
+        const msgId = r.lastID;
         const fromUser = await dbGet('SELECT displayName FROM users WHERE id = ?', [fromId]).catch(()=>null);
-        const payload = { from: fromId, fromDisplayName: fromUser?.displayName || fromId, content, created_at: new Date() };
+        const payload = { id: msgId, from: fromId, fromDisplayName: fromUser?.displayName || fromId, toId: toId||null, room: room||null, content, created_at: new Date().toISOString() };
         if (room) io.to(room).emit('message', payload);
         else if (toId) (onlineUsers[toId]||[]).forEach(sid => io.to(sid).emit('message', payload));
         else io.emit('message', payload);
       } catch (err) { console.error('socket message err', err); }
+    });
+
+    // delete_message via socket: owner within 5 minutes OR admin
+    socket.on('delete_message', async ({ id }) => {
+      try {
+        if (!id) return;
+        const row = await dbGet('SELECT * FROM messages WHERE id = ?', [id]).catch(()=>null);
+        if (!row) return;
+        const requester = socket.user;
+        const isOwner = Number(row.from_id) === Number(requester.id);
+        const created = new Date(row.created_at).getTime();
+        const now = Date.now();
+        const within5Min = (now - created) <= (5 * 60 * 1000);
+        if (requester.role === 'admin' || (isOwner && within5Min)) {
+          await dbRun('DELETE FROM messages WHERE id = ?', [id]);
+          await audit(requester.id, 'delete_message', id, { byAdmin: requester.role === 'admin' });
+          io.emit('delete_message', { id });
+        } else {
+          socket.emit('delete_failed', { id, reason: 'not_allowed' });
+        }
+      } catch (err) { console.error('socket delete_message err', err); }
     });
 
     // WebRTC signaling events
