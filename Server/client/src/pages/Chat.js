@@ -9,7 +9,7 @@ export default function Chat() {
   const [socket, setSocket] = useState(null);
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
-  const [room, setRoom] = useState('global');
+  const [room] = useState('global');
   const messagesRef = useRef();
 
   useEffect(() => {
@@ -17,9 +17,11 @@ export default function Chat() {
     const s = io(process.env.REACT_APP_SOCKET || (process.env.REACT_APP_API || ''), {
       auth: { token }
     });
+
     s.on('connect', () => console.log('socket connected', s.id));
 
     s.on('message', (m) => setMessages(prev => [...prev, m]));
+
     s.on('message_recalled', (id) => {
       setMessages(prev =>
         prev.map(m => m.id === id ? { ...m, content: '[Tin nhắn đã thu hồi]' } : m)
@@ -28,6 +30,7 @@ export default function Chat() {
 
     setSocket(s);
     s.emit('join_room', { room: 'global' });
+
     return () => s.disconnect();
   }, [token]);
 
@@ -62,16 +65,18 @@ export default function Chat() {
   };
 
   return (
-    <div className="app-card">
-      <h3>Chat — Phòng: {room}</h3>
-      <div 
-        ref={messagesRef} 
+    <div className="app-card" style={{ maxWidth: 600, margin: "20px auto" }}>
+      <h3 style={{ marginBottom: 10 }}>💬 Chat — Phòng: {room}</h3>
+
+      <div
+        ref={messagesRef}
         style={{
-          height: 320, 
-          overflow: 'auto', 
-          border: '1px solid #eee', 
-          padding: 8,
-          background: '#fafafa'
+          height: 350,
+          overflowY: 'auto',
+          border: '1px solid #ddd',
+          padding: 10,
+          borderRadius: 6,
+          background: '#f9f9f9'
         }}
       >
         {messages.map((m, i) => {
@@ -81,55 +86,67 @@ export default function Chat() {
             user.role === 'admin';
 
           return (
-            <div 
-              key={m.id || i} 
-              style={{ 
-                marginBottom: 10, 
-                padding: 6, 
-                borderRadius: 6,
-                background: isMyMsg ? '#d1f7c4' : '#fff',
+            <div
+              key={m.id || i}
+              style={{
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
+                justifyContent: isMyMsg ? 'flex-end' : 'flex-start',
+                marginBottom: 10
               }}
             >
-              <div>
-                <b>{m.fromDisplayName || m.from}</b>: {m.content}
-                <span className="small" style={{ marginLeft: 8, fontSize: '0.8em', color: '#666' }}>
+              <div
+                style={{
+                  background: isMyMsg ? '#d1f7c4' : '#fff',
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  maxWidth: '70%',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  position: 'relative'
+                }}
+              >
+                <div style={{ fontSize: '0.85em', marginBottom: 2 }}>
+                  <b>{m.fromDisplayName || m.from}</b>
+                </div>
+                <div>{m.content}</div>
+                <div style={{ fontSize: '0.7em', color: '#666', marginTop: 4 }}>
                   {new Date(m.created_at).toLocaleTimeString()}
-                </span>
+                </div>
+
+                {canRecall && m.content !== '[Tin nhắn đã thu hồi]' && (
+                  <button
+                    onClick={() => recall(m.id)}
+                    style={{
+                      position: 'absolute',
+                      bottom: 4,
+                      right: -65,
+                      fontSize: '0.7em',
+                      color: '#fff',
+                      background: '#ff6b6b',
+                      border: 'none',
+                      borderRadius: 4,
+                      padding: '2px 6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Thu hồi
+                  </button>
+                )}
               </div>
-              {canRecall && m.content !== '[Tin nhắn đã thu hồi]' && (
-                <button
-                  onClick={() => recall(m.id)}
-                  style={{ 
-                    marginLeft: 10, 
-                    fontSize: '0.7em', 
-                    color: '#fff',
-                    background: '#ff6b6b',
-                    border: 'none',
-                    borderRadius: 4,
-                    padding: '2px 6px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Thu hồi
-                </button>
-              )}
             </div>
           );
         })}
       </div>
 
-      <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+      <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
         <input
           className="input"
           style={{ flex: 1 }}
+          placeholder="Nhập tin nhắn..."
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send()}
         />
-        <button className="btn" onClick={send}>Send</button>
+        <button className="btn" onClick={send}>Gửi</button>
       </div>
     </div>
   );
