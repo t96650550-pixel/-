@@ -1,5 +1,4 @@
 // Chat.js
-// Chat.js
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth';
 import { io } from 'socket.io-client';
@@ -20,10 +19,7 @@ export default function Chat() {
     });
     s.on('connect', () => console.log('socket connected', s.id));
 
-    // nhận message mới
     s.on('message', (m) => setMessages(prev => [...prev, m]));
-
-    // nhận cập nhật khi có recall
     s.on('message_recalled', (id) => {
       setMessages(prev =>
         prev.map(m => m.id === id ? { ...m, content: '[Tin nhắn đã thu hồi]' } : m)
@@ -35,7 +31,6 @@ export default function Chat() {
     return () => s.disconnect();
   }, [token]);
 
-  // load tin nhắn từ API khi mới vào
   useEffect(() => {
     if (!token) return;
     api.get(`/chat/${room}`, { headers: { Authorization: `Bearer ${token}` } })
@@ -43,7 +38,6 @@ export default function Chat() {
       .catch(err => console.error(err));
   }, [room, token]);
 
-  // auto scroll
   useEffect(() => {
     if (messagesRef.current) {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
@@ -59,7 +53,6 @@ export default function Chat() {
   const recall = async (id) => {
     try {
       await api.post(`/chat/${room}/recall/${id}`, {}, { headers: { Authorization: `Bearer ${token}` } });
-      // client tự cập nhật
       setMessages(prev =>
         prev.map(m => m.id === id ? { ...m, content: '[Tin nhắn đã thu hồi]' } : m)
       );
@@ -71,7 +64,16 @@ export default function Chat() {
   return (
     <div className="app-card">
       <h3>Chat — Phòng: {room}</h3>
-      <div ref={messagesRef} style={{ height: 320, overflow: 'auto', border: '1px solid #eee', padding: 8 }}>
+      <div 
+        ref={messagesRef} 
+        style={{
+          height: 320, 
+          overflow: 'auto', 
+          border: '1px solid #eee', 
+          padding: 8,
+          background: '#fafafa'
+        }}
+      >
         {messages.map((m, i) => {
           const isMyMsg = m.from === user.username;
           const canRecall =
@@ -79,15 +81,37 @@ export default function Chat() {
             user.role === 'admin';
 
           return (
-            <div key={m.id || i} style={{ marginBottom: 8 }}>
-              <b>{m.fromDisplayName || m.from}</b>: {m.content}
-              <span className="small" style={{ marginLeft: 8 }}>
-                {new Date(m.created_at).toLocaleTimeString()}
-              </span>
+            <div 
+              key={m.id || i} 
+              style={{ 
+                marginBottom: 10, 
+                padding: 6, 
+                borderRadius: 6,
+                background: isMyMsg ? '#d1f7c4' : '#fff',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <div>
+                <b>{m.fromDisplayName || m.from}</b>: {m.content}
+                <span className="small" style={{ marginLeft: 8, fontSize: '0.8em', color: '#666' }}>
+                  {new Date(m.created_at).toLocaleTimeString()}
+                </span>
+              </div>
               {canRecall && m.content !== '[Tin nhắn đã thu hồi]' && (
                 <button
                   onClick={() => recall(m.id)}
-                  style={{ marginLeft: 8, fontSize: '0.8em' }}
+                  style={{ 
+                    marginLeft: 10, 
+                    fontSize: '0.7em', 
+                    color: '#fff',
+                    background: '#ff6b6b',
+                    border: 'none',
+                    borderRadius: 4,
+                    padding: '2px 6px',
+                    cursor: 'pointer'
+                  }}
                 >
                   Thu hồi
                 </button>
@@ -96,9 +120,11 @@ export default function Chat() {
           );
         })}
       </div>
+
       <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
         <input
           className="input"
+          style={{ flex: 1 }}
           value={text}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send()}
