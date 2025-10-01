@@ -1,0 +1,44 @@
+:root{
+  --bg:#f6f8fb;
+  --card:#ffffff;
+  --accent:#ff7ab6;
+  --muted:#8b8b9a;
+}
+body{ margin:0; font-family:Inter, system-ui, Arial; background:var(--bg); }
+.card{ background:var(--card); border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,0.06); padding:16px; }
+.auth-page{ height:100vh; display:flex; align-items:center; justify-content:center; }
+.auth-card{ width:320px; text-align:center; }
+.auth-card input{ width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid #e6e6ef; }
+.btn{ background:var(--accent); color:white; border:none; padding:10px 14px; border-radius:10px; cursor:pointer; }
+.btn.ghost{ background:transparent; border:1px solid #eee; color:#333; }
+.error{ color:#d23; margin-top:8px; }
+
+.chat-page{ display:flex; height:100vh; gap:18px; padding:18px; box-sizing:border-box; }
+.sidebar{ width:260px; display:flex; flex-direction:column; gap:12px; padding:16px; }
+.user-block{ display:flex; gap:10px; align-items:center; }
+.avatar{ width:44px; height:44px; background:linear-gradient(135deg,var(--accent),#ffc3d6); color:white; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:700; }
+.rooms button{ display:block; width:100%; padding:8px; margin:6px 0; border-radius:8px; border:none; cursor:pointer; background:#fafafa; }
+.rooms button.active{ background:linear-gradient(90deg,#ffe7f2,#ffdff0); box-shadow:0 4px 12px rgba(255,122,182,0.12) }
+
+.chat-main{ flex:1; display:flex; flex-direction:column; padding:12px; }
+.chat-header{ display:flex; justify-content:space-between; align-items:center; padding:6px 8px; }
+.messages{ flex:1; overflow:auto; padding:12px; display:flex; flex-direction:column; gap:12px; }
+.message{ max-width:70%; }
+.message.me{ align-self:flex-end; text-align:right; }
+.bubble{ background:linear-gradient(135deg,#fff,#fff); padding:10px 12px; border-radius:12px; display:inline-block; animation:pop .16s ease; }
+.message.me .bubble{ background:linear-gradient(135deg,#ffdeee,#ffb7da); color:#222; }
+.meta{ font-size:12px; color:var(--muted); margin-bottom:6px; }
+.time { font-size:11px; margin-left:8px; color:#aaa; }
+.media{ max-width:320px; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,0.06) }
+
+.composer{ display:flex; gap:8px; padding:10px; align-items:center; }
+.composer input[type="text"]{ flex:1; padding:10px; border-radius:12px; border:1px solid #eee; }
+.composer input[type="file"]{ }
+.small{ font-size:12px; }
+.muted{ color:var(--muted); }
+
+/* small pop animation */
+@keyframes pop {
+  from { transform:translateY(6px) scale(.98); opacity:0 }
+  to { transform:none; opacity:1 }
+}
