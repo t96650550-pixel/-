@@ -1,3 +1,4 @@
+// Login.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
@@ -23,14 +24,14 @@ export default function Login(){
     <div className="app-card" style={{maxWidth:420, margin:'40px auto'}}>
       <h2>Đăng nhập</h2>
       <form onSubmit={submit}>
-        <input className="input" placeholder="username" value={username} onChange={e=>setUsername(e.target.value)} />
-        <input className="input" type="password" placeholder="password" value={password} onChange={e=>setPassword(e.target.value)} />
+        <input className="input" placeholder="username" value={username} onChange={e=>setUsername(e.target.value)} required />
+        <input className="input" type="password" placeholder="password" value={password} onChange={e=>setPassword(e.target.value)} required />
         <button className="btn" type="submit">Đăng nhập</button>
       </form>
 
       <div style={{marginTop:12}}>
-        <button className="input" onClick={()=> window.location = (process.env.REACT_APP_API || 'http://localhost:4000') + '/auth/google'}>Đăng nhập với Google</button>
-        <button className="input" onClick={()=> window.location = (process.env.REACT_APP_API || 'http://localhost:4000') + '/auth/facebook'}>Đăng nhập với Facebook</button>
+        <button className="input" onClick={()=> window.location = (process.env.REACT_APP_API || '') + '/auth/google'}>Đăng nhập với Google</button>
+        <button className="input" onClick={()=> window.location = (process.env.REACT_APP_API || '') + '/auth/facebook'}>Đăng nhập với Facebook</button>
       </div>
       <div className="small">Nếu quên pass, hỏi admin để reset (demo).</div>
     </div>
