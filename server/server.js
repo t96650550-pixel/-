@@ -1,4 +1,3 @@
-// server/server.js
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -14,10 +13,12 @@ const { Server } = require('socket.io');
 
 const JWT_SECRET = 'replace_with_strong_secret_in_prod';
 const PORT = process.env.PORT || 4000;
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
+// middleware
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
@@ -29,11 +30,18 @@ app.use(rateLimit({
   max: 200
 }));
 
-// Create uploads folder
+// === STATIC FRONTEND ===
+app.use(express.static(path.join(__dirname, 'public')));
+
+// fallback cho "/" → index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// === UPLOADS FOLDER ===
 const UPLOADS = path.join(__dirname, 'uploads');
 if (!fs.existsSync(UPLOADS)) fs.mkdirSync(UPLOADS);
 
-// multer for uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS),
   filename: (req, file, cb) => {
@@ -43,10 +51,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB
 
-// Serve uploaded files
 app.use('/uploads', express.static(UPLOADS));
 
-// Setup DB
+// === DATABASE ===
 const DB_FILE = path.join(__dirname, 'chat.db');
 const db = new sqlite3.Database(DB_FILE);
 db.serialize(() => {
@@ -65,13 +72,13 @@ db.serialize(() => {
     sender_name TEXT,
     room TEXT,
     content TEXT,
-    type TEXT DEFAULT 'text', -- text|image|video
+    type TEXT DEFAULT 'text',
     url TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 });
 
-// Helpers
+// === HELPERS ===
 function generateToken(user) {
   return jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
 }
@@ -86,12 +93,13 @@ function authMiddleware(req, res, next) {
   });
 }
 
-// Routes
+// === ROUTES ===
+
+// register
 app.post('/api/register', (req, res) => {
   const { username, password, display_name } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'username & password required' });
-  const saltRounds = 10;
-  bcrypt.hash(password, saltRounds, (err, hash) => {
+  bcrypt.hash(password, 10, (err, hash) => {
     if (err) return res.status(500).json({ error: 'hash error' });
     const stmt = db.prepare("INSERT INTO users (username, password, display_name) VALUES (?, ?, ?)");
     stmt.run(username, hash, display_name || username, function(err) {
@@ -106,6 +114,7 @@ app.post('/api/register', (req, res) => {
   });
 });
 
+// login
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'username & password required' });
@@ -121,7 +130,7 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-// Upload avatar
+// upload avatar
 app.post('/api/upload-avatar', authMiddleware, upload.single('file'), (req, res) => {
   const fileUrl = `/uploads/${path.basename(req.file.path)}`;
   db.run("UPDATE users SET avatar = ? WHERE id = ?", [fileUrl, req.user.id], function(err) {
@@ -130,13 +139,13 @@ app.post('/api/upload-avatar', authMiddleware, upload.single('file'), (req, res)
   });
 });
 
-// Upload media (image/video) used in messages
+// upload media
 app.post('/api/upload', authMiddleware, upload.single('file'), (req, res) => {
   const fileUrl = `/uploads/${path.basename(req.file.path)}`;
   res.json({ url: fileUrl });
 });
 
-// Get recent messages (per room)
+// get messages
 app.get('/api/messages/:room', authMiddleware, (req, res) => {
   const room = req.params.room || 'global';
   db.all("SELECT * FROM messages WHERE room = ? ORDER BY created_at ASC LIMIT 1000", [room], (err, rows) => {
@@ -145,7 +154,7 @@ app.get('/api/messages/:room', authMiddleware, (req, res) => {
   });
 });
 
-// simple users list
+// get users
 app.get('/api/users', authMiddleware, (req, res) => {
   db.all("SELECT id, username, display_name, avatar, role FROM users", [], (err, rows) => {
     if (err) return res.status(500).json({ error: 'db error' });
@@ -153,7 +162,7 @@ app.get('/api/users', authMiddleware, (req, res) => {
   });
 });
 
-// store message (can be used by REST or sockets)
+// post message
 app.post('/api/messages', authMiddleware, (req, res) => {
   const { room = 'global', content, type = 'text', url = null } = req.body;
   db.run("INSERT INTO messages (sender_id, sender_name, room, content, type, url) VALUES (?, ?, ?, ?, ?, ?)",
@@ -168,13 +177,11 @@ app.post('/api/messages', authMiddleware, (req, res) => {
   });
 });
 
-// SOCKET.IO real-time
-const online = {}; // socketId -> { userId, username }
+// === SOCKET.IO ===
+const online = {};
 io.on('connection', (socket) => {
-  // simple auth on connect via token param
   const token = socket.handshake.auth && socket.handshake.auth.token;
   if (!token) {
-    // allow but mark anonymous
     socket.data.user = { id: null, username: 'Guest' };
   } else {
     try {
@@ -189,7 +196,7 @@ io.on('connection', (socket) => {
     socket.join(room);
     socket.data.room = room;
     online[socket.id] = { userId: socket.data.user.id, username: socket.data.user.username, room };
-    io.to(room).emit('user_list', Object.values(online).filter(o=>o.room===room));
+    io.to(room).emit('user_list', Object.values(online).filter(o => o.room === room));
     socket.to(room).emit('notification', { text: `${socket.data.user.username} đã vào phòng.` });
   });
 
@@ -199,7 +206,6 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send_message', (payload) => {
-    // payload: {room, content, type, url}
     const room = payload.room || socket.data.room || 'global';
     const stmt = db.prepare("INSERT INTO messages (sender_id, sender_name, room, content, type, url) VALUES (?, ?, ?, ?, ?, ?)");
     stmt.run(socket.data.user.id, socket.data.user.username, room, payload.content || '', payload.type || 'text', payload.url || null, function(err) {
@@ -218,10 +224,11 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const room = socket.data.room;
     delete online[socket.id];
-    if (room) io.to(room).emit('user_list', Object.values(online).filter(o=>o.room===room));
+    if (room) io.to(room).emit('user_list', Object.values(online).filter(o => o.room === room));
   });
 });
 
+// === START SERVER ===
 server.listen(PORT, () => {
-  console.log(`Chat server running on http://localhost:${PORT}`);
+  console.log(`🚀 Chat server running on http://localhost:${PORT}`);
 });
