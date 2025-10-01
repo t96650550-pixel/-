@@ -19,9 +19,7 @@ export default function Chat() {
     });
 
     s.on('connect', () => console.log('socket connected', s.id));
-
     s.on('message', (m) => setMessages(prev => [...prev, m]));
-
     s.on('message_recalled', (id) => {
       setMessages(prev =>
         prev.map(m => m.id === id ? { ...m, content: '[Tin nhắn đã thu hồi]' } : m)
@@ -80,10 +78,10 @@ export default function Chat() {
         }}
       >
         {messages.map((m, i) => {
-          const isMyMsg = m.from === user.username;
+          const isMyMsg = user && m.from === user.username;
           const canRecall =
-            (isMyMsg && Date.now() - new Date(m.created_at).getTime() < 5 * 60 * 1000) ||
-            user.role === 'admin';
+            (isMyMsg && Date.now() - new Date(m.created_at || Date.now()).getTime() < 5 * 60 * 1000) ||
+            (user && user.role === 'admin');
 
           return (
             <div
@@ -105,11 +103,11 @@ export default function Chat() {
                 }}
               >
                 <div style={{ fontSize: '0.85em', marginBottom: 2 }}>
-                  <b>{m.fromDisplayName || m.from}</b>
+                  <b>{m.fromDisplayName || m.from || 'Ẩn danh'}</b>
                 </div>
                 <div>{m.content}</div>
                 <div style={{ fontSize: '0.7em', color: '#666', marginTop: 4 }}>
-                  {new Date(m.created_at).toLocaleTimeString()}
+                  {new Date(m.created_at || Date.now()).toLocaleTimeString()}
                 </div>
 
                 {canRecall && m.content !== '[Tin nhắn đã thu hồi]' && (
