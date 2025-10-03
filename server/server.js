@@ -2,6 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -30,10 +31,17 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// routes
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', verifyTokenMiddleware, adminRoutes);
 app.use('/api/messages', verifyTokenMiddleware, messageRoutes);
+
+// 👉 serve React build (frontend)
+const clientBuildPath = path.join(__dirname, 'build'); 
+app.use(express.static(clientBuildPath));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
+});
 
 // socket auth & events
 io.use(async (socket, next) => {
@@ -49,16 +57,16 @@ io.use(async (socket, next) => {
 io.on('connection', async (socket) => {
   const user = socket.user;
   console.log('connected', user.username, user.id);
-  // join room global
   socket.join('global');
 
   // send last 100 messages
-  const msgs = await db.all('SELECT * FROM messages WHERE deleted = 0 ORDER BY created_at DESC LIMIT 100');
+  const msgs = await db.all(
+    'SELECT * FROM messages WHERE deleted = 0 ORDER BY created_at DESC LIMIT 100'
+  );
   socket.emit('history', msgs.reverse());
 
   socket.on('sendMessage', async (payload) => {
     try {
-      // check banned/locked
       const row = await db.get('SELECT banned, locked FROM users WHERE id = ?', [user.id]);
       if (!row) return;
       if (row.banned || row.locked) {
@@ -67,7 +75,6 @@ io.on('connection', async (socket) => {
       }
       const content = String(payload.content || '').trim();
       if (!content) return;
-      // insert
       const now = Date.now();
       const res = await db.run(
         `INSERT INTO messages (user_id, username, content, created_at, is_system, deleted) VALUES (?, ?, ?, ?, 0, 0)`,
@@ -118,4 +125,4 @@ io.on('connection', async (socket) => {
 })();
 
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => console.log(`Server listening ${PORT}`));
+server.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
