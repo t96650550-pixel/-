@@ -52,13 +52,17 @@ export default function Chat({ token, user, onLogout }) {
 
       <div style={{flex:1,display:'flex'}}>
         {/* Chat box */}
-        <div style={{flex:2,borderRight:'1px solid #ccc',padding:10,overflowY:'auto'}}>
-          {messages.map(m=>(
-            <div key={m.id} style={{marginBottom:8}}>
-              <b>{m.display_name}:</b> {m.text}
-            </div>
-          ))}
-        </div>
+<div className="chat-messages">
+  {messages.map(m => (
+    <div
+      key={m.id}
+      className={`chat-message ${m.display_name === user.display_name ? "me" : "other"}`}
+    >
+      <b>{m.display_name}</b>
+      <span>{m.text}</span>
+    </div>
+  ))}
+</div>
 
         {/* User list + admin panel */}
         <div style={{flex:1,padding:10,overflowY:'auto'}}>
