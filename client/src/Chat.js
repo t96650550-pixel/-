@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import axios from 'axios';
+import './Chat.css';
 
 const API = process.env.REACT_APP_API || 'http://localhost:3001';
 
