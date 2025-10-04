@@ -44,36 +44,50 @@ export default function Chat({ token, user, onLogout }) {
   }
 
   return (
-    <div style={{display:'flex',flexDirection:'column',height:'80vh'}}>
-      <div style={{display:'flex',justifyContent:'space-between',padding:'10px',background:'#5561ff',color:'white'}}>
-        <div>Xin chào, {user.display_name} {user.is_admin ? '(Admin)' : ''}</div>
-        <button onClick={onLogout} style={{background:'white',color:'#5561ff',borderRadius:5}}>Đăng xuất</button>
+    <div className="chat-container">
+      {/* Header */}
+      <div className="chat-header">
+        <div>
+          Xin chào, {user.display_name} {user.is_admin ? '(Admin)' : ''}
+        </div>
+        <button onClick={onLogout} style={{background:'white',color:'#5561ff',borderRadius:5}}>
+          Đăng xuất
+        </button>
       </div>
 
-      <div style={{flex:1,display:'flex'}}>
-        {/* Chat box */}
-<div className="chat-messages">
-  {messages.map(m => (
-    <div
-      key={m.id}
-      className={`chat-message ${m.display_name === user.display_name ? "me" : "other"}`}
-    >
-      <b>{m.display_name}</b>
-      <span>{m.text}</span>
-    </div>
-  ))}
-</div>
+      {/* Body */}
+      <div className="chat-body">
+        {/* Chat messages */}
+        <div className="chat-messages">
+          {messages.map(m => (
+            <div
+              key={m.id}
+              className={`chat-message ${m.display_name === user.display_name ? "me" : "other"}`}
+            >
+              <b>{m.display_name}</b>
+              <span>{m.text}</span>
+            </div>
+          ))}
+        </div>
 
         {/* User list + admin panel */}
-        <div style={{flex:1,padding:10,overflowY:'auto'}}>
+        <div className="chat-users">
           <h4>Người dùng</h4>
-          {users.map(u=>(
+          {users.map(u => (
             <div key={u.id} style={{marginBottom:6}}>
               {u.display_name} {u.is_admin ? '(A)' : ''}
               {user.is_admin && !u.is_admin && (
                 <button 
-                  onClick={()=>toggleLock(u)}
-                  style={{marginLeft:10,background:u.is_locked?'green':'red',color:'white'}}
+                  onClick={() => toggleLock(u)}
+                  style={{
+                    marginLeft:10,
+                    background: u.is_locked ? 'green' : 'red',
+                    color: 'white',
+                    borderRadius: 5,
+                    padding: '4px 8px',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
                 >
                   {u.is_locked ? 'Mở khóa' : 'Khóa'}
                 </button>
@@ -83,9 +97,14 @@ export default function Chat({ token, user, onLogout }) {
         </div>
       </div>
 
-      <form onSubmit={sendMessage} style={{display:'flex',padding:10,borderTop:'1px solid #ccc'}}>
-        <input style={{flex:1,padding:10}} placeholder="Nhập tin nhắn..." value={text} onChange={e=>setText(e.target.value)} />
-        <button type="submit" style={{marginLeft:10}}>Gửi</button>
+      {/* Footer */}
+      <form onSubmit={sendMessage} className="chat-footer">
+        <input
+          placeholder="Nhập tin nhắn..."
+          value={text}
+          onChange={e => setText(e.target.value)}
+        />
+        <button type="submit">Gửi</button>
       </form>
     </div>
   );
