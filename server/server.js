@@ -8,6 +8,7 @@ const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
 const { db, init } = require("./db");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 const server = http.createServer(app);
@@ -23,6 +24,11 @@ const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key";
 
 // ✅ Khởi tạo database
 init();
+
+// Theo dõi lỗi database
+db.on("error", (err) => {
+  console.error("🔥 SQLite error:", err.message);
+});
 
 // Middleware kiểm tra token
 function auth(req, res, next) {
@@ -51,8 +57,9 @@ app.post("/api/register", (req, res) => {
     function (err) {
       if (err) {
         console.error("❌ Lỗi tạo tài khoản:", err.message);
-        return res.status(500).json({ error: "Tài khoản đã tồn tại hoặc lỗi server" });
+        return res.status(500).json({ error: err.message }); // Hiện lỗi thật
       }
+      console.log(`✅ Tạo tài khoản mới: ${username}`);
       return res.json({ success: true, message: "Đăng ký thành công!" });
     }
   );
@@ -62,7 +69,10 @@ app.post("/api/register", (req, res) => {
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
   db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
-    if (err) return res.status(500).json({ error: "Lỗi server" });
+    if (err) {
+      console.error("🔥 Lỗi truy vấn login:", err.message);
+      return res.status(500).json({ error: "Lỗi server" });
+    }
     if (!user) return res.status(404).json({ error: "Không tìm thấy tài khoản" });
     if (user.is_locked) return res.status(403).json({ error: "Tài khoản bị khóa" });
 
@@ -75,6 +85,7 @@ app.post("/api/login", (req, res) => {
       { expiresIn: "7d" }
     );
 
+    console.log(`🔓 ${username} đăng nhập thành công`);
     res.json({
       success: true,
       token,
@@ -86,13 +97,18 @@ app.post("/api/login", (req, res) => {
 
 // ✅ Admin khóa / mở tài khoản
 app.post("/api/admin/lock", auth, (req, res) => {
-  if (!req.user.is_admin) return res.status(403).json({ error: "Không có quyền" });
+  if (!req.user.is_admin)
+    return res.status(403).json({ error: "Không có quyền" });
   const { username, lock } = req.body;
   db.run(
     `UPDATE users SET is_locked = ? WHERE username = ?`,
     [lock ? 1 : 0, username],
     function (err) {
-      if (err) return res.status(500).json({ error: "Lỗi server" });
+      if (err) {
+        console.error("🔥 Lỗi khóa tài khoản:", err.message);
+        return res.status(500).json({ error: "Lỗi server" });
+      }
+      console.log(`${lock ? "🔒 Khóa" : "🔓 Mở"} tài khoản: ${username}`);
       res.json({ success: true });
     }
   );
@@ -101,7 +117,10 @@ app.post("/api/admin/lock", auth, (req, res) => {
 // ✅ Lấy tin nhắn cũ
 app.get("/api/messages", (req, res) => {
   db.all(`SELECT * FROM messages ORDER BY id DESC LIMIT 50`, (err, rows) => {
-    if (err) return res.status(500).json({ error: "Lỗi server" });
+    if (err) {
+      console.error("🔥 Lỗi tải tin nhắn:", err.message);
+      return res.status(500).json({ error: "Lỗi server" });
+    }
     res.json(rows.reverse());
   });
 });
@@ -112,13 +131,15 @@ io.on("connection", (socket) => {
 
   socket.on("sendMessage", (msg) => {
     const { display_name, text } = msg;
-    if (!text.trim()) return;
+    if (!text?.trim()) return;
 
     db.run(
       `INSERT INTO messages (display_name, text) VALUES (?, ?)`,
       [display_name, text],
       (err) => {
-        if (!err) {
+        if (err) {
+          console.error("🔥 Lỗi lưu tin nhắn:", err.message);
+        } else {
           io.emit("newMessage", {
             display_name,
             text,
@@ -136,7 +157,7 @@ io.on("connection", (socket) => {
 
 // ✅ Dùng build React nếu có
 const clientPath = path.join(__dirname, "../client/build");
-if (require("fs").existsSync(clientPath)) {
+if (fs.existsSync(clientPath)) {
   app.use(express.static(clientPath));
   app.get("*", (req, res) => {
     res.sendFile(path.join(clientPath, "index.html"));
@@ -147,6 +168,8 @@ if (require("fs").existsSync(clientPath)) {
   });
 }
 
-// ✅ Chạy server
-const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// ✅ Chờ SQLite tạo xong bảng rồi mới start server
+setTimeout(() => {
+  const PORT = process.env.PORT || 10000;
+  server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+}, 1500);
