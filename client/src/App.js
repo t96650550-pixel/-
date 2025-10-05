@@ -1,41 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import Auth from './Auth';
-import Chat from './Chat';
+import React, { useState } from "react";
+import Auth from "./Auth";
+import "./auth.css";
 
-export default function App(){
-  const [user, setUser] = useState(() => {
-    const s = localStorage.getItem('chat_user');
-    return s ? JSON.parse(s) : null;
-  });
-  const [token, setToken] = useState(() => localStorage.getItem('chat_token') || '');
-
-  useEffect(()=>{
-    if(user && token){
-      localStorage.setItem('chat_user', JSON.stringify(user));
-      localStorage.setItem('chat_token', token);
-    } else {
-      localStorage.removeItem('chat_user');
-      localStorage.removeItem('chat_token');
-    }
-  }, [user, token]);
-
-  function handleAuth(u, t){
-    setUser(u);
-    setToken(t);
-  }
-
-  function handleLogout(){
-    setUser(null);
-    setToken('');
-  }
+function App() {
+  const [user, setUser] = useState(null);
 
   return (
     <div>
       {!user ? (
-        <Auth onAuth={handleAuth} />
+        <Auth onLogin={setUser} />
       ) : (
-        <Chat user={user} token={token} onLogout={handleLogout} />
+        <h2>Chào {user.display_name}! ✨ Chat sắp tới nha~</h2>
       )}
     </div>
   );
 }
+
+export default App;
