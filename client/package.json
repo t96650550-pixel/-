@@ -1,15 +1,17 @@
 {
-  "name":"chat-client",
-  "version":"1.0.0",
-  "private":true,
-  "dependencies":{
-    "react":"^18.2.0",
-    "react-dom":"^18.2.0",
-    "socket.io-client":"^4.6.1",
-    "axios":"^1.4.0"
+  "name": "chat-client",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "axios": "^1.4.0",
+    "socket.io-client": "^4.7.2"
   },
-  "scripts":{
-    "start":"react-scripts start",
-    "build":"react-scripts build"
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
   }
 }
