@@ -1,182 +1,145 @@
-require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const cors = require('cors');
-const helmet = require('helmet');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
-const path = require('path');
+require("dotenv").config();
+const express = require("express");
+const http = require("http");
+const cors = require("cors");
+const helmet = require("helmet");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const { Server } = require("socket.io");
+const { db, init } = require("./db");
 
-const { db, init } = require('./db');
+// Khởi tạo database
 init();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
-const PORT = process.env.PORT || 3001;
-
 const app = express();
-app.use(helmet());
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "*" },
+});
+
 app.use(cors());
 app.use(express.json());
+app.use(helmet());
 
-// ==== Helper JWT ====
-function signToken(payload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
-}
-function verifyToken(token) {
+// 🔐 Secret cho JWT
+const JWT_SECRET = process.env.JWT_SECRET || "super_secret_key";
+
+// Middleware kiểm tra token
+function auth(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Thiếu token" });
+
   try {
-    return jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
   } catch {
-    return null;
+    return res.status(403).json({ error: "Token không hợp lệ" });
   }
 }
 
-// ==== Auth routes ====
-app.post('/api/register', async (req, res) => {
+// ✅ Đăng ký
+app.post("/api/register", (req, res) => {
   const { username, password, display_name } = req.body;
-  if (!username || !password)
-    return res.status(400).json({ error: 'Username & password required' });
+  if (!username || !password || !display_name) {
+    return res.status(400).json({ error: "Thiếu thông tin đăng ký" });
+  }
 
-  const hashed = await bcrypt.hash(password, 10);
+  const hashedPassword = bcrypt.hashSync(password, 10);
   db.run(
-    `INSERT INTO users (username,password,display_name) VALUES (?,?,?)`,
-    [username, hashed, display_name || username],
+    `INSERT INTO users (username, password, display_name) VALUES (?, ?, ?)`,
+    [username, hashedPassword, display_name],
     function (err) {
       if (err) {
-        return res.status(400).json({ error: 'Username exists' });
+        console.error("❌ Lỗi khi tạo tài khoản:", err.message);
+        return res
+          .status(500)
+          .json({ error: "Tài khoản đã tồn tại hoặc lỗi server" });
       }
-      const user = {
-        id: this.lastID,
-        username,
-        display_name: display_name || username,
-        is_admin: 0,
-      };
-      const token = signToken(user);
-      res.json({ user, token });
+      return res.json({ success: true, message: "Đăng ký thành công!" });
     }
   );
 });
 
-app.post('/api/login', (req, res) => {
+// ✅ Đăng nhập
+app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
-  db.get('SELECT * FROM users WHERE username = ?', [username], async (err, row) => {
-    if (err) return res.status(500).json({ error: 'DB error' });
-    if (!row) return res.status(400).json({ error: 'Invalid credentials' });
-    if (row.is_locked) return res.status(403).json({ error: 'Account locked' });
+  db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
+    if (err) return res.status(500).json({ error: "Lỗi server" });
+    if (!user) return res.status(404).json({ error: "Không tìm thấy tài khoản" });
+    if (user.is_locked) return res.status(403).json({ error: "Tài khoản bị khóa" });
 
-    const ok = await bcrypt.compare(password, row.password);
-    if (!ok) return res.status(400).json({ error: 'Invalid credentials' });
+    if (!bcrypt.compareSync(password, user.password)) {
+      return res.status(401).json({ error: "Sai mật khẩu" });
+    }
 
-    const user = {
-      id: row.id,
-      username: row.username,
-      display_name: row.display_name,
-      is_admin: row.is_admin,
-    };
-    const token = signToken(user);
-    res.json({ user, token });
+    const token = jwt.sign(
+      { id: user.id, username: user.username, is_admin: !!user.is_admin },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+    res.json({
+      success: true,
+      token,
+      display_name: user.display_name,
+      is_admin: user.is_admin,
+    });
   });
 });
 
-// ==== Admin: lock/unlock ====
-app.post('/api/admin/toggle-lock', (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  const payload = verifyToken(token);
-  if (!payload || !payload.is_admin)
-    return res.status(403).json({ error: 'Forbidden' });
-
-  const { userId, lock } = req.body;
-  db.run('UPDATE users SET is_locked = ? WHERE id = ?', [lock ? 1 : 0, userId], function (err) {
-    if (err) return res.status(500).json({ error: 'DB error' });
+// ✅ Admin khóa / mở tài khoản
+app.post("/api/admin/lock", auth, (req, res) => {
+  if (!req.user.is_admin) return res.status(403).json({ error: "Không có quyền" });
+  const { username, lock } = req.body;
+  db.run(`UPDATE users SET is_locked = ? WHERE username = ?`, [lock ? 1 : 0, username], function (err) {
+    if (err) return res.status(500).json({ error: "Lỗi server" });
     res.json({ success: true });
   });
 });
 
-// ==== Messages & Users ====
-app.get('/api/messages', (req, res) => {
-  db.all('SELECT * FROM messages ORDER BY created_at DESC LIMIT 200', [], (err, rows) => {
-    if (err) return res.status(500).json({ error: 'DB error' });
+// ✅ Socket chat
+io.on("connection", (socket) => {
+  console.log("🟢 Client connected:", socket.id);
+
+  socket.on("sendMessage", (msg) => {
+    const { display_name, text } = msg;
+    if (!text.trim()) return;
+
+    db.run(
+      `INSERT INTO messages (display_name, text) VALUES (?, ?)`,
+      [display_name, text],
+      (err) => {
+        if (!err) {
+          io.emit("newMessage", {
+            display_name,
+            text,
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+    );
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🔴 Client disconnected:", socket.id);
+  });
+});
+
+// ✅ Lấy tin nhắn cũ
+app.get("/api/messages", (req, res) => {
+  db.all(`SELECT * FROM messages ORDER BY id DESC LIMIT 50`, (err, rows) => {
+    if (err) return res.status(500).json({ error: "Lỗi server" });
     res.json(rows.reverse());
   });
 });
 
-app.get('/api/users', (req, res) => {
-  db.all('SELECT id,username,display_name,is_admin,is_locked FROM users', [], (err, rows) => {
-    if (err) return res.status(500).json({ error: 'DB error' });
-    res.json(rows);
-  });
+// ✅ Trang test
+app.get("/", (req, res) => {
+  res.send("💬 Chat server is running!");
 });
 
-// ==== Serve client build khi deploy ====
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '..', 'client', 'build')));
-  app.get('*', (req, res) =>
-    res.sendFile(path.join(__dirname, '..', 'client', 'build', 'index.html'))
-  );
-}
-
-// ==== Socket.io ====
-const httpServer = http.createServer(app);
-const io = new Server(httpServer, {
-  cors: { origin: process.env.CLIENT_ORIGIN || '*' },
-});
-
-io.use((socket, next) => {
-  const token = socket.handshake.auth?.token;
-  if (!token) return next();
-  const p = verifyToken(token);
-  if (p) socket.user = p;
-  next();
-});
-
-io.on('connection', (socket) => {
-  const user = socket.user || null;
-
-  socket.on('send_message', (msg) => {
-    if (user && user.id) {
-      db.get('SELECT is_locked FROM users WHERE id = ?', [user.id], (err, row) => {
-        if (err) return;
-        if (row?.is_locked) return socket.emit('error_message', 'Account locked');
-
-        const display_name = user.display_name || user.username;
-        db.run(
-          'INSERT INTO messages (user_id, display_name, text) VALUES (?,?,?)',
-          [user.id, display_name, msg],
-          function (err) {
-            if (err) return;
-            const message = {
-              id: this.lastID,
-              user_id: user.id,
-              display_name,
-              text: msg,
-              created_at: new Date().toISOString(),
-            };
-            io.emit('message', message);
-          }
-        );
-      });
-    } else {
-      const display_name = 'Guest';
-      db.run(
-        'INSERT INTO messages (user_id, display_name, text) VALUES (NULL,?,?)',
-        [display_name, msg],
-        function (err) {
-          if (err) return;
-          const message = {
-            id: this.lastID,
-            user_id: null,
-            display_name,
-            text: msg,
-            created_at: new Date().toISOString(),
-          };
-          io.emit('message', message);
-        }
-      );
-    }
-  });
-});
-
-// ==== Start server ====
-httpServer.listen(PORT, () => {
-  console.log('🚀 Server running on port', PORT);
+// 🔥 Render yêu cầu PORT từ biến môi trường
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
