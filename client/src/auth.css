@@ -1,48 +1,78 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import './App.css';
-
-function App() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-
-  const toggleForm = () => setIsLogin(!isLogin);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const endpoint = isLogin ? '/login' : '/register';
-      const res = await axios.post(endpoint, { username, password });
-      alert(res.data.message || (isLogin ? 'Đăng nhập thành công!' : 'Tạo tài khoản thành công!'));
-    } catch (err) {
-      alert(err.response?.data?.error || 'Có lỗi xảy ra!');
-    }
-  };
-
-  return (
-    <div className="container">
-      <h2>{isLogin ? 'Đăng Nhập' : 'Đăng Ký'}</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Tên người dùng"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Mật khẩu"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button type="submit">{isLogin ? 'Đăng Nhập' : 'Đăng Ký'}</button>
-      </form>
-      <div className="switch" onClick={toggleForm}>
-        {isLogin ? 'Chưa có tài khoản? Đăng ký ngay' : 'Đã có tài khoản? Đăng nhập'}
-      </div>
-    </div>
-  );
+body {
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(135deg, #89f7fe, #66a6ff);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
 }
 
-export default App;
+.container {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  padding: 30px 40px;
+  width: 340px;
+  text-align: center;
+  animation: fadeIn 0.8s ease-in-out;
+}
+
+h2 {
+  color: white;
+  margin-bottom: 20px;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+}
+
+input {
+  width: 90%;
+  padding: 12px;
+  margin: 10px 0;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  font-size: 15px;
+  outline: none;
+  transition: 0.3s;
+}
+
+input::placeholder {
+  color: #666;
+}
+
+input:focus {
+  background: white;
+  box-shadow: 0 0 6px rgba(255,255,255,0.6);
+}
+
+button {
+  background: linear-gradient(135deg, #6EE7B7, #3B82F6);
+  border: none;
+  padding: 12px 18px;
+  color: white;
+  border-radius: 10px;
+  font-size: 15px;
+  cursor: pointer;
+  width: 100%;
+  transition: 0.3s;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  opacity: 0.9;
+}
+
+.switch {
+  margin-top: 12px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
