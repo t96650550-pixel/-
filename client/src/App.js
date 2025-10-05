@@ -1,43 +1,88 @@
-import React, {useState, useEffect} from 'react';
-import Login from './Login';
-import Register from './Register';
-import Chat from './Chat';
+import React, { useState } from "react";
+import axios from "axios";
+import Chat from "./Chat";
+import "./auth.css";
 
-export default function App(){
-  const [token, setToken] = useState(localStorage.getItem('token'));
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')||'null'));
+const API_BASE = process.env.REACT_APP_API_URL || "https://your-render-server-url.onrender.com";
 
-  function onLogin(data){
-    setToken(data.token);
-    setUser(data.user);
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
+export default function App() {
+  const [mode, setMode] = useState("login"); // login hoặc register
+  const [user, setUser] = useState(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    try {
+      if (mode === "login") {
+        const res = await axios.post(`${API_BASE}/api/login`, { username, password });
+        localStorage.setItem("token", res.data.token);
+        setUser(res.data.user);
+      } else {
+        const res = await axios.post(`${API_BASE}/api/register`, {
+          username,
+          password,
+          display_name: displayName,
+        });
+        localStorage.setItem("token", res.data.token);
+        setUser(res.data.user);
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || "Lỗi rồi, thử lại nha 💔");
+    }
   }
-  function onLogout(){
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-  }
+
+  if (user) return <Chat user={user} token={localStorage.getItem("token")} />;
 
   return (
-    <div style={{fontFamily:'Inter, sans-serif',display:'flex',justifyContent:'center',padding:20}}>
-      <div style={{width:900,boxShadow:'0 10px 30px rgba(0,0,0,0.12)',borderRadius:12,overflow:'hidden'}}>
-        {!token ? (
-          <div style={{display:'flex'}}>
-            <div style={{flex:1,padding:30,background:'#f7f9ff'}}>
-              <h2>Welcome ✨</h2>
-              <p>Chat realtime, đăng ký hoặc đăng nhập đi nè.</p>
-            </div>
-            <div style={{flex:1,padding:20}}>
-              <Login onLogin={onLogin}/>
-              <hr/>
-              <Register onLogin={onLogin}/>
-            </div>
-          </div>
-        ) : (
-          <Chat token={token} user={user} onLogout={onLogout}/>
-        )}
+    <div className="auth-container">
+      <div className="auth-card">
+        <h2>{mode === "login" ? "Đăng nhập" : "Đăng ký"}</h2>
+        <form onSubmit={handleSubmit}>
+          {mode === "register" && (
+            <input
+              type="text"
+              placeholder="Tên hiển thị ✨"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              required
+            />
+          )}
+          <input
+            type="text"
+            placeholder="Tên đăng nhập"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Mật khẩu"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          {error && <div className="error">{error}</div>}
+          <button type="submit">
+            {mode === "login" ? "Vào chat 💬" : "Tạo tài khoản ✨"}
+          </button>
+        </form>
+
+        <p className="switch-mode">
+          {mode === "login" ? (
+            <>
+              Chưa có tài khoản?{" "}
+              <span onClick={() => setMode("register")}>Đăng ký liền nè</span>
+            </>
+          ) : (
+            <>
+              Đã có tài khoản?{" "}
+              <span onClick={() => setMode("login")}>Đăng nhập ngay</span>
+            </>
+          )}
+        </p>
       </div>
     </div>
   );
