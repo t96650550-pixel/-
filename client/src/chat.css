@@ -1,0 +1,35 @@
+/* chat.css */
+.chat-container {
+  background: #f7f8fa;
+  color: #333;
+  font-family: 'Poppins', sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-box {
+  width: 80%;
+  height: 70vh;
+  overflow-y: auto;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.message {
+  margin: 5px 0;
+  padding: 8px 12px;
+  background: #e1f5fe;
+  border-radius: 10px;
+  display: inline-block;
+}
+
+.message.self {
+  background: #c8e6c9;
+  align-self: flex-end;
+}
