@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
+// 🌸 Dùng import.meta.env để đọc biến môi trường từ Vite
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function App(){
@@ -12,10 +13,16 @@ export default function App(){
   const socketRef = useRef(null);
   const [text, setText] = useState('');
 
+  // 🌸 Khi load app, nếu có token cũ thì lấy lại
+  useEffect(() => {
+    const saved = localStorage.getItem('token');
+    if (saved) setAccess(saved);
+  }, []);
+
   useEffect(()=> {
     if(access){
       // fetch profile
-      axios.get(API + '/api/me', { headers: { Authorization: 'Bearer ' + access } })
+      axios.get(`${API}/api/me`, { headers: { Authorization: 'Bearer ' + access } })
         .then(r=> setMe(r.data.user)).catch(()=>{});
       // connect socket
       socketRef.current = io(API, { auth: { token: access }});
@@ -27,20 +34,21 @@ export default function App(){
 
   useEffect(()=> {
     // load last messages
-    axios.get(API + '/api/messages').then(r=> setMessages(r.data.messages)).catch(()=>{});
+    axios.get(`${API}/api/messages`).then(r=> setMessages(r.data.messages)).catch(()=>{});
   },[]);
 
   const login = async (email, password) => {
     try{
-      const r = await axios.post(API + '/api/login', { email, password }, { withCredentials:true });
+      const r = await axios.post(`${API}/api/login`, { email, password }, { withCredentials:true });
       setAccess(r.data.access);
+      localStorage.setItem('token', r.data.access); // 🌸 Lưu token để không bị đăng xuất khi F5
       setView('chat');
     }catch(e){ alert('login failed'); }
   };
 
   const register = async (email, username, password) => {
     try{
-      await axios.post(API + '/api/register', { email, username, password });
+      await axios.post(`${API}/api/register`, { email, username, password });
       alert('registered - please login');
       setView('login');
     }catch(e){ alert('register failed'); }
@@ -50,6 +58,15 @@ export default function App(){
     if(!text) return;
     socketRef.current.emit('send_message', { text });
     setText('');
+  };
+
+  const logout = async () => {
+    try {
+      await axios.post(`${API}/api/logout`);
+    } catch {}
+    localStorage.removeItem('token');
+    setAccess(null);
+    setView('login');
   };
 
   if(view === 'login') return <Auth onLogin={login} onGotoRegister={()=>setView('register')} onReset={()=>setView('reset')} />;
@@ -67,7 +84,7 @@ export default function App(){
         <button onClick={send}>Send</button>
       </div>
       <div style={{marginTop:10}}>
-        <button onClick={async ()=>{ await axios.post(API + '/api/logout'); setAccess(null); setView('login'); }}>Logout</button>
+        <button onClick={logout}>Logout</button>
       </div>
     </div>
   );
@@ -83,6 +100,7 @@ function Auth({ onLogin, onGotoRegister, onReset }){
       <input placeholder="password" type="password" value={password} onChange={e=>setPassword(e.target.value)} /><br/>
       <button onClick={()=>onLogin(email,password)}>Login</button>
       <button onClick={onGotoRegister}>Register</button>
+      <button onClick={onReset}>Forgot?</button>
     </div>
   );
 }
@@ -108,7 +126,11 @@ function Reset({ onBack }){
   const [link, setLink] = useState('');
   const call = async () => {
     try{
-      const r = await (await fetch((process.env.API_URL || 'http://localhost:3000') + '/api/request-reset',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email }) })).json();
+      const r = await (await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/request-reset`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ email })
+      })).json();
       if(r.link) setLink(r.link);
     }catch(e){ alert('fail'); }
   };
