@@ -1,0 +1,1 @@
+Client: `npm install` then `npm start` (Vite). Set API_URL env var to server URL if needed.
